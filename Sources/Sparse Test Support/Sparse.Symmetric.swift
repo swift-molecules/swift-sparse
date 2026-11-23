@@ -2,21 +2,21 @@ public import Cardinal
 public import Sparse
 
 extension Sparse.Symmetric {
-    /// The `order × order` tridiagonal Toeplitz matrix with `diagonal` on the diagonal and `offDiagonal` beside it.
+    /// The `order × order` tridiagonal Toeplitz matrix with `diagonal` on the diagonal and `subdiagonal` beside it.
     ///
-    /// Its eigenvalues are `diagonal + 2·offDiagonal·cos(pπ/(order+1))` for `p` in `1...order`, with eigenvectors
+    /// Its eigenvalues are `diagonal + 2·subdiagonal·cos(pπ/(order+1))` for `p` in `1...order`, with eigenvectors
     /// `sin(p i π/(order+1))`.
     public static func tridiagonal(
         order: Cardinal,
         diagonal: Scalar,
-        offDiagonal: Scalar
+        subdiagonal: Scalar
     ) throws(Sparse.Error) -> Self {
         let order = Int(bitPattern: order)
         var entries: [Entry] = []
         var index = 0
         while index < order {
             entries.append(Self.entry(index, index, diagonal))
-            if index + 1 < order { entries.append(Self.entry(index, index + 1, offDiagonal)) }
+            if index + 1 < order { entries.append(Self.entry(index, index + 1, subdiagonal)) }
             index += 1
         }
         return try Self(order: Cardinal(UInt(order)), entries: entries)

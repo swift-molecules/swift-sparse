@@ -84,7 +84,7 @@ extension `Sparse Tests` {
         @Test
         func `The norm is the largest absolute row sum`() throws {
             #expect(try Sparse.Symmetric<Double>.laplacian(rows: 4, columns: 4).norm == 8)
-            #expect(try Sparse.Symmetric<Double>.tridiagonal(order: 5, diagonal: 2, offDiagonal: -1).norm == 4)
+            #expect(try Sparse.Symmetric<Double>.tridiagonal(order: 5, diagonal: 2, subdiagonal: -1).norm == 4)
         }
     }
 
@@ -129,7 +129,7 @@ extension `Sparse Tests` {
         @Test
         func `An indefinite matrix factors and solves without pivoting where its pivots are not zero`() throws {
             let matrix = try Sparse.Symmetric<Double>.laplacian(rows: 20, columns: 15)
-                .adding(try .tridiagonal(order: 300, diagonal: 1, offDiagonal: 0), scaledBy: -3.3)
+                .adding(try .tridiagonal(order: 300, diagonal: 1, subdiagonal: 0), scaledBy: -3.3)
             let factorization = try matrix.factorization()
             let x = `Sparse Tests`.vector(300)
             #expect(`Sparse Tests`.distance(factorization.solved(matrix.applied(to: x)), x) < 1e-9)
@@ -150,7 +150,7 @@ extension `Sparse Tests` {
                 p += 1
             }
             let matrix = try Sparse.Symmetric<Double>.laplacian(rows: Cardinal(UInt(rows)), columns: Cardinal(UInt(columns)))
-                .adding(try .tridiagonal(order: Cardinal(UInt(rows * columns)), diagonal: 1, offDiagonal: 0), scaledBy: -shift)
+                .adding(try .tridiagonal(order: Cardinal(UInt(rows * columns)), diagonal: 1, subdiagonal: 0), scaledBy: -shift)
             let inertia = try matrix.factorization().inertia
             #expect(inertia.negative == below)
             #expect(inertia.positive == rows * columns - below)
@@ -167,7 +167,7 @@ extension `Sparse Tests` {
             let elimination = Sparse.Elimination(try Sparse.Symmetric<Double>.laplacian(rows: 3, columns: 3).pattern)
             #expect(throws: Sparse.Error.pattern) {
                 try Sparse.Symmetric.Factorization(
-                    try Sparse.Symmetric<Double>.tridiagonal(order: 9, diagonal: 2, offDiagonal: -1),
+                    try Sparse.Symmetric<Double>.tridiagonal(order: 9, diagonal: 2, subdiagonal: -1),
                     elimination: elimination
                 )
             }
