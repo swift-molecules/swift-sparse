@@ -9,23 +9,26 @@ let package = Package(
         .library(name: "Sparse Test Support", targets: ["Sparse Test Support"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/swift-atoms/swift-cardinal.git", branch: "main")
+        .package(url: "https://github.com/swift-atoms/swift-cardinal.git", branch: "main"),
+        .package(url: "https://github.com/swift-atoms/swift-ordinal.git", branch: "main"),
     ],
     targets: [
-        .target(name: "Sparse"),
+        .target(
+            name: "Sparse",
+            dependencies: [
+                .product(name: "Cardinal", package: "swift-cardinal"),
+                .product(name: "Ordinal", package: "swift-ordinal"),
+            ]
+        ),
         .target(
             name: "Sparse Test Support",
-            dependencies: [
-                .target(name: "Sparse"),
-                .product(name: "Cardinal", package: "swift-cardinal"),
-            ]
+            dependencies: [.target(name: "Sparse")]
         ),
         .testTarget(
             name: "Sparse Tests",
             dependencies: [
                 .target(name: "Sparse"),
                 .target(name: "Sparse Test Support"),
-                .product(name: "Cardinal", package: "swift-cardinal"),
             ]
         ),
     ],

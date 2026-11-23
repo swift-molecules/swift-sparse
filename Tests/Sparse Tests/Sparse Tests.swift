@@ -49,9 +49,6 @@ extension `Sparse Tests` {
             #expect(throws: Sparse.Error.index(row: 0, column: 3)) {
                 try Sparse.Symmetric<Double>(order: 3, entries: [.init(0, 3, 1)])
             }
-            #expect(throws: Sparse.Error.order) {
-                try Sparse.Symmetric<Double>(order: -1, entries: [])
-            }
         }
 
         @Test
@@ -76,10 +73,9 @@ extension `Sparse Tests` {
             let a = try Sparse.Symmetric<Double>.scattered(order: 40, perRow: 3, seed: 5)
             let b = try Sparse.Symmetric<Double>.laplacian(rows: 5, columns: 8)
             let sum = try a.adding(b, scaledBy: -2.5)
-            for row in 0..<40 {
-                for column in 0..<40 {
-                    #expect(sum[row, column] == a[row, column] - 2.5 * b[row, column])
-                }
+            let places = (0..<40).flatMap { row in (0..<40).map { (Ordinal(UInt(row)), Ordinal(UInt($0))) } }
+            places.forEach { row, column in
+                #expect(sum[row, column] == a[row, column] - 2.5 * b[row, column])
             }
             #expect(try a.adding(b, scaledBy: 0).pattern == sum.pattern)
             #expect(throws: Sparse.Error.order) { try a.adding(try .laplacian(rows: 2, columns: 2)) }
@@ -98,12 +94,12 @@ extension `Sparse Tests` {
         func `A dissection is a permutation, also of a graph in several pieces`() throws {
             var entries = try Sparse.Symmetric<Double>.laplacian(rows: 30, columns: 30).entries
             entries += try Sparse.Symmetric<Double>.laplacian(rows: 7, columns: 3).entries.map {
-                .init($0.row + 900, $0.column + 900, $0.value)
+                .init(Ordinal(UInt(Int(bitPattern: $0.row) + 900)), Ordinal(UInt(Int(bitPattern: $0.column) + 900)), $0.value)
             }
-            let matrix = try! Sparse.Symmetric<Double>(order: 925, entries: entries)
+            let matrix = try Sparse.Symmetric<Double>(order: 925, entries: entries)
             let ordering = Sparse.Ordering.dissection(of: matrix.pattern, leaf: 8)
             #expect(ordering.permutation.sorted() == Array(0..<925))
-            for (position, original) in ordering.permutation.enumerated() {
+            ordering.permutation.enumerated().forEach { position, original in
                 #expect(ordering.position[original] == position)
             }
         }
@@ -111,7 +107,7 @@ extension `Sparse Tests` {
         @Test
         func `On a grid a dissection fills in far less than the natural order`() throws {
             let pattern = try Sparse.Symmetric<Double>.laplacian(rows: 100, columns: 100).pattern
-            let natural = Sparse.Elimination(pattern, ordering: .natural(order: pattern.order)).count
+            let natural = Sparse.Elimination(pattern, ordering: .natural(order: Cardinal(UInt(pattern.order)))).count
             let dissected = Sparse.Elimination(pattern).count
             // The natural order fills the band: about 100 entries a column.
             #expect(natural > 900_000)
@@ -124,7 +120,7 @@ extension `Sparse Tests` {
         @Test(arguments: [1, 2, 7, 48, 1000])
         func `A solve inverts the product`(leaf: Int) throws {
             let matrix = try Sparse.Symmetric<Double>.scattered(order: 300, perRow: 4, seed: 11)
-            let elimination = Sparse.Elimination(matrix.pattern, ordering: .dissection(of: matrix.pattern, leaf: leaf))
+            let elimination = Sparse.Elimination(matrix.pattern, ordering: .dissection(of: matrix.pattern, leaf: Cardinal(UInt(leaf))))
             let factorization = try Sparse.Symmetric.Factorization(matrix, elimination: elimination)
             let x = `Sparse Tests`.vector(300)
             #expect(`Sparse Tests`.distance(factorization.solved(matrix.applied(to: x)), x) < 1e-12)
@@ -148,8 +144,10 @@ extension `Sparse Tests` {
                 return 4 * s * s
             }
             var below = 0
-            for p in 1...rows {
-                for q in 1...columns where mu(p, rows) + mu(q, columns) < shift { below += 1 }
+            var p = 1
+            while p <= rows {
+                below += (1...columns).filter { mu(p, rows) + mu($0, columns) < shift }.count
+                p += 1
             }
             let matrix = try Sparse.Symmetric<Double>.laplacian(rows: Cardinal(UInt(rows)), columns: Cardinal(UInt(columns)))
                 .adding(try .tridiagonal(order: Cardinal(UInt(rows * columns)), diagonal: 1, offDiagonal: 0), scaledBy: -shift)

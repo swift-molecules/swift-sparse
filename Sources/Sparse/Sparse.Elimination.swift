@@ -47,7 +47,11 @@ extension Sparse.Elimination {
             }
             row += 1
         }
-        for index in 0..<order { rowStarts[index + 1] += rowStarts[index] }
+        var index = 0
+        while index < order {
+            rowStarts[index + 1] += rowStarts[index]
+            index += 1
+        }
         var next = Array(rowStarts[0..<order])
         var rowColumns = [Int](repeating: 0, count: pattern.count)
         var sources = [Int](repeating: 0, count: pattern.count)
@@ -89,7 +93,11 @@ extension Sparse.Elimination {
             k += 1
         }
         var columnStarts = [Int](repeating: 0, count: order + 1)
-        for k in 0..<order { columnStarts[k + 1] = columnStarts[k] + counts[k] }
+        k = 0
+        while k < order {
+            columnStarts[k + 1] = columnStarts[k] + counts[k]
+            k += 1
+        }
         self.pattern = pattern
         self.ordering = ordering
         self.parent = parent

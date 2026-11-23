@@ -27,8 +27,9 @@ extension Sparse.Pattern {
 
     /// The stored columns of row `row`, each at or right of the diagonal, in increasing order.
     @inlinable
-    public func columns(in row: Int) -> ArraySlice<Int> {
-        columns[starts[row]..<starts[row + 1]]
+    public func columns(in row: Ordinal) -> ArraySlice<Int> {
+        let row = Int(bitPattern: row)
+        return columns[starts[row]..<starts[row + 1]]
     }
 
     /// The position of the entry at `row`, `column` (with `row <= column`) among the stored entries, if stored.
@@ -60,7 +61,11 @@ extension Sparse.Pattern {
             }
             row += 1
         }
-        for row in 0..<order { degree[row + 1] += degree[row] }
+        row = 0
+        while row < order {
+            degree[row + 1] += degree[row]
+            row += 1
+        }
         var next = Array(degree[0..<order])
         var neighbours = [Int](repeating: 0, count: degree[order])
         row = 0
