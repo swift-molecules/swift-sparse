@@ -6,8 +6,8 @@ extension Sparse {
         /// The number of positive eigenvalues.
         public let positive: Int
 
-        @inlinable
-        public init(negative: Int, positive: Int) {
+        @usableFromInline
+        internal init(negative: Int, positive: Int) {
             self.negative = negative
             self.positive = positive
         }

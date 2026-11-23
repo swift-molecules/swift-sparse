@@ -34,20 +34,28 @@ extension Sparse.Elimination {
         let order = pattern.order
         precondition(ordering.permutation.count == order, "an ordering of the pattern's order")
         let position = ordering.position
-        // The permuted lower triangle, row by row.
+        // WHY: the permuted lower triangle, row by row, is what the up-looking factorization reads.
         var rowStarts = [Int](repeating: 0, count: order + 1)
-        for row in 0..<order {
-            for stored in pattern.starts[row]..<pattern.starts[row + 1] {
+        var row = 0
+        while row < order {
+            var stored = pattern.starts[row]
+            let storedEnd = pattern.starts[row + 1]
+            while stored < storedEnd {
                 let column = pattern.columns[stored]
                 rowStarts[Swift.max(position[row], position[column]) + 1] += 1
+                stored += 1
             }
+            row += 1
         }
         for index in 0..<order { rowStarts[index + 1] += rowStarts[index] }
         var next = Array(rowStarts[0..<order])
         var rowColumns = [Int](repeating: 0, count: pattern.count)
         var sources = [Int](repeating: 0, count: pattern.count)
-        for row in 0..<order {
-            for stored in pattern.starts[row]..<pattern.starts[row + 1] {
+        row = 0
+        while row < order {
+            var stored = pattern.starts[row]
+            let storedEnd = pattern.starts[row + 1]
+            while stored < storedEnd {
                 let column = pattern.columns[stored]
                 let a = position[row]
                 let b = position[column]
@@ -55,15 +63,20 @@ extension Sparse.Elimination {
                 rowColumns[next[high]] = Swift.min(a, b)
                 sources[next[high]] = stored
                 next[high] += 1
+                stored += 1
             }
+            row += 1
         }
-        // The elimination tree and the count of each column of the factor (Liu; Davis's LDL).
+        // WHY: the elimination tree and each column count of the factor follow Liu, as in Davis's LDL.
         var parent = [Int](repeating: -1, count: order)
         var flag = [Int](repeating: -1, count: order)
         var counts = [Int](repeating: 0, count: order)
-        for k in 0..<order {
+        var k = 0
+        while k < order {
             flag[k] = k
-            for stored in rowStarts[k]..<rowStarts[k + 1] {
+            var stored = rowStarts[k]
+            let storedEnd = rowStarts[k + 1]
+            while stored < storedEnd {
                 var i = rowColumns[stored]
                 while i < k && flag[i] != k {
                     if parent[i] == -1 { parent[i] = k }
@@ -71,7 +84,9 @@ extension Sparse.Elimination {
                     flag[i] = k
                     i = parent[i]
                 }
+                stored += 1
             }
+            k += 1
         }
         var columnStarts = [Int](repeating: 0, count: order + 1)
         for k in 0..<order { columnStarts[k + 1] = columnStarts[k] + counts[k] }

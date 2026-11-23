@@ -66,7 +66,7 @@ extension Sparse.Ordering {
             while let (vertices, first) = work.popLast() {
                 stamp += 1
                 for vertex in vertices { piece[vertex] = stamp }
-                // Breadth-first search from the first vertex; a piece that is not connected splits into its components.
+                // WHY: a breadth-first search from the first vertex tells whether the piece is connected; if not, it splits into its components.
                 let reached = search(from: vertices[0])
                 if reached < vertices.count {
                     var start = first
@@ -101,8 +101,10 @@ extension Sparse.Ordering {
 
         /// Numbers the `count` vertices last found by `search` in reverse breadth-first order (reverse Cuthill–McKee).
         mutating func number(_ count: Int, from first: Int) {
-            for index in 0..<count {
+            var index = 0
+            while index < count {
                 permutation[first + count - 1 - index] = queue[index]
+                index += 1
             }
         }
 
@@ -119,7 +121,9 @@ extension Sparse.Ordering {
             while head < tail {
                 let vertex = queue[head]
                 head += 1
-                for position in starts[vertex]..<starts[vertex + 1] {
+                var position = starts[vertex]
+                let positionEnd = starts[vertex + 1]
+                while position < positionEnd {
                     let neighbour = neighbours[position]
                     if piece[neighbour] == label {
                         piece[neighbour] = seen
@@ -127,6 +131,7 @@ extension Sparse.Ordering {
                         queue[tail] = neighbour
                         tail += 1
                     }
+                    position += 1
                 }
             }
             for index in 0..<tail { piece[queue[index]] = label }
@@ -138,8 +143,9 @@ extension Sparse.Ordering {
             var root = vertices[0]
             var count = search(from: root)
             var depth = level[queue[count - 1]]
-            // Pseudo-peripheral root: restart from a vertex of least degree in the last level while the depth grows.
-            for _ in 0..<8 {
+            // WHY: a pseudo-peripheral root makes long, thin levels: restart from a vertex of least degree in the last level while the depth grows.
+            var round = 0
+            while round < 8 {
                 var candidate = queue[count - 1]
                 var least = Int.max
                 var index = count - 1
@@ -161,28 +167,32 @@ extension Sparse.Ordering {
                 root = candidate
                 count = reached
                 depth = reach
+                round += 1
             }
             guard depth >= 2 else { return nil }
             var sizes = [Int](repeating: 0, count: depth + 1)
             for index in 0..<count { sizes[level[queue[index]]] += 1 }
-            // The smallest level whose cut leaves between 30% and 70% of the piece before it, else the middle level.
+            // WHY: the cut is the smallest level that leaves between 30% and 70% of the piece before it, else the middle level.
             var chosen = -1
             var middle = -1
             var before = sizes[0]
-            for candidate in 1..<depth {
+            var candidate = 1
+            while candidate < depth {
                 let after = before + sizes[candidate]
                 if middle < 0 && 2 * after >= count { middle = candidate }
                 if 10 * before >= 3 * count && 10 * after <= 7 * count {
                     if chosen < 0 || sizes[candidate] < sizes[chosen] { chosen = candidate }
                 }
                 before = after
+                candidate += 1
             }
             if chosen < 0 { chosen = middle >= 0 ? middle : depth / 2 }
             let label = piece[root]
             var near: [Int] = []
             var far: [Int] = []
             var cut: [Int] = []
-            for index in 0..<count {
+            var index = 0
+            while index < count {
                 let vertex = queue[index]
                 let at = level[vertex]
                 if at < chosen {
@@ -190,17 +200,21 @@ extension Sparse.Ordering {
                 } else if at > chosen {
                     far.append(vertex)
                 } else {
-                    // A vertex of the cut with no neighbour on the far side joins the near side.
+                    // WHY: a vertex of the cut with no neighbour on the far side separates nothing, so it joins the near side.
                     var touches = false
-                    for position in starts[vertex]..<starts[vertex + 1] {
+                    var position = starts[vertex]
+                    let positionEnd = starts[vertex + 1]
+                    while position < positionEnd {
                         let neighbour = neighbours[position]
                         if piece[neighbour] == label && level[neighbour] == chosen + 1 {
                             touches = true
                             break
                         }
+                        position += 1
                     }
                     if touches { cut.append(vertex) } else { near.append(vertex) }
                 }
+                index += 1
             }
             for (index, vertex) in cut.enumerated() {
                 permutation[first + near.count + far.count + index] = vertex

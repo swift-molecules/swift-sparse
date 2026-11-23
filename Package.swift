@@ -8,17 +8,24 @@ let package = Package(
         .library(name: "Sparse", targets: ["Sparse"]),
         .library(name: "Sparse Test Support", targets: ["Sparse Test Support"]),
     ],
+    dependencies: [
+        .package(url: "https://github.com/swift-atoms/swift-cardinal.git", branch: "main")
+    ],
     targets: [
         .target(name: "Sparse"),
         .target(
             name: "Sparse Test Support",
-            dependencies: [.target(name: "Sparse")]
+            dependencies: [
+                .target(name: "Sparse"),
+                .product(name: "Cardinal", package: "swift-cardinal"),
+            ]
         ),
         .testTarget(
             name: "Sparse Tests",
             dependencies: [
                 .target(name: "Sparse"),
                 .target(name: "Sparse Test Support"),
+                .product(name: "Cardinal", package: "swift-cardinal"),
             ]
         ),
     ],

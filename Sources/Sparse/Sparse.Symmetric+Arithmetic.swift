@@ -14,17 +14,22 @@ extension Sparse.Symmetric {
         let starts = pattern.starts
         let columns = pattern.columns
         for row in 0..<order { result[row] = 0 }
-        for row in 0..<order {
+        var row = 0
+        while row < order {
             let first = starts[row]
             let x = vector[row]
             var sum = values[first] * x
-            for position in (first + 1)..<starts[row + 1] {
+            var position = first + 1
+            let positionEnd = starts[row + 1]
+            while position < positionEnd {
                 let column = columns[position]
                 let value = values[position]
                 sum += value * vector[column]
                 result[column] += value * x
+                position += 1
             }
             result[row] += sum
+            row += 1
         }
     }
 
@@ -50,7 +55,8 @@ extension Sparse.Symmetric {
         var sums: [Scalar] = []
         let a = pattern
         let b = other.pattern
-        for row in 0..<order {
+        var row = 0
+        while row < order {
             starts[row] = columns.count
             var p = a.starts[row]
             var q = b.starts[row]
@@ -74,6 +80,7 @@ extension Sparse.Symmetric {
                     q += 1
                 }
             }
+            row += 1
         }
         starts[order] = columns.count
         return Self(pattern: Sparse.Pattern(order: order, starts: starts, columns: columns), values: sums)

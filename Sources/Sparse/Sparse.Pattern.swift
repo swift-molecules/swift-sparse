@@ -49,23 +49,33 @@ extension Sparse.Pattern {
     @usableFromInline
     internal func adjacency() -> (starts: [Int], neighbours: [Int]) {
         var degree = [Int](repeating: 0, count: order + 1)
-        for row in 0..<order {
-            for position in (starts[row] + 1)..<starts[row + 1] {
+        var row = 0
+        while row < order {
+            var position = starts[row] + 1
+            let positionEnd = starts[row + 1]
+            while position < positionEnd {
                 degree[row + 1] += 1
                 degree[columns[position] + 1] += 1
+                position += 1
             }
+            row += 1
         }
         for row in 0..<order { degree[row + 1] += degree[row] }
         var next = Array(degree[0..<order])
         var neighbours = [Int](repeating: 0, count: degree[order])
-        for row in 0..<order {
-            for position in (starts[row] + 1)..<starts[row + 1] {
+        row = 0
+        while row < order {
+            var position = starts[row] + 1
+            let positionEnd = starts[row + 1]
+            while position < positionEnd {
                 let column = columns[position]
                 neighbours[next[row]] = column
                 next[row] += 1
                 neighbours[next[column]] = row
                 next[column] += 1
+                position += 1
             }
+            row += 1
         }
         return (degree, neighbours)
     }

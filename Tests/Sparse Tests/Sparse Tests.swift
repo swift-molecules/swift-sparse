@@ -1,3 +1,4 @@
+import Cardinal
 import Foundation
 import Sparse
 import Sparse_Test_Support
@@ -44,7 +45,7 @@ extension `Sparse Tests` {
         }
 
         @Test
-        func `An entry outside the matrix is refused`() {
+        func `An entry outside the matrix is refused`() throws {
             #expect(throws: Sparse.Error.index(row: 0, column: 3)) {
                 try Sparse.Symmetric<Double>(order: 3, entries: [.init(0, 3, 1)])
             }
@@ -55,7 +56,7 @@ extension `Sparse Tests` {
 
         @Test
         func `The stored entries rebuild the same matrix`() throws {
-            let matrix = Sparse.Symmetric<Double>.scattered(order: 50, perRow: 4)
+            let matrix = try Sparse.Symmetric<Double>.scattered(order: 50, perRow: 4)
             #expect(try Sparse.Symmetric(order: 50, entries: matrix.entries) == matrix)
         }
     }
@@ -63,8 +64,8 @@ extension `Sparse Tests` {
     @Suite
     struct Arithmetic {
         @Test
-        func `The product matches the dense product`() {
-            let matrix = Sparse.Symmetric<Double>.scattered(order: 60, perRow: 5, seed: 3)
+        func `The product matches the dense product`() throws {
+            let matrix = try Sparse.Symmetric<Double>.scattered(order: 60, perRow: 5, seed: 3)
             let x = `Sparse Tests`.vector(60)
             let expected = `Sparse Tests`.dense(matrix.dense, times: x)
             #expect(`Sparse Tests`.distance(matrix.applied(to: x), expected) < 1e-12)
@@ -72,8 +73,8 @@ extension `Sparse Tests` {
 
         @Test
         func `A sum lives on the union of the patterns and adds entry by entry`() throws {
-            let a = Sparse.Symmetric<Double>.scattered(order: 40, perRow: 3, seed: 5)
-            let b = Sparse.Symmetric<Double>.laplacian(rows: 5, columns: 8)
+            let a = try Sparse.Symmetric<Double>.scattered(order: 40, perRow: 3, seed: 5)
+            let b = try Sparse.Symmetric<Double>.laplacian(rows: 5, columns: 8)
             let sum = try a.adding(b, scaledBy: -2.5)
             for row in 0..<40 {
                 for column in 0..<40 {
@@ -81,22 +82,22 @@ extension `Sparse Tests` {
                 }
             }
             #expect(try a.adding(b, scaledBy: 0).pattern == sum.pattern)
-            #expect(throws: Sparse.Error.order) { try a.adding(.laplacian(rows: 2, columns: 2)) }
+            #expect(throws: Sparse.Error.order) { try a.adding(try .laplacian(rows: 2, columns: 2)) }
         }
 
         @Test
-        func `The norm is the largest absolute row sum`() {
-            #expect(Sparse.Symmetric<Double>.laplacian(rows: 4, columns: 4).norm == 8)
-            #expect(Sparse.Symmetric<Double>.tridiagonal(order: 5, diagonal: 2, offDiagonal: -1).norm == 4)
+        func `The norm is the largest absolute row sum`() throws {
+            #expect(try Sparse.Symmetric<Double>.laplacian(rows: 4, columns: 4).norm == 8)
+            #expect(try Sparse.Symmetric<Double>.tridiagonal(order: 5, diagonal: 2, offDiagonal: -1).norm == 4)
         }
     }
 
     @Suite
     struct Ordering {
         @Test
-        func `A dissection is a permutation, also of a graph in several pieces`() {
-            var entries = Sparse.Symmetric<Double>.laplacian(rows: 30, columns: 30).entries
-            entries += Sparse.Symmetric<Double>.laplacian(rows: 7, columns: 3).entries.map {
+        func `A dissection is a permutation, also of a graph in several pieces`() throws {
+            var entries = try Sparse.Symmetric<Double>.laplacian(rows: 30, columns: 30).entries
+            entries += try Sparse.Symmetric<Double>.laplacian(rows: 7, columns: 3).entries.map {
                 .init($0.row + 900, $0.column + 900, $0.value)
             }
             let matrix = try! Sparse.Symmetric<Double>(order: 925, entries: entries)
@@ -108,8 +109,8 @@ extension `Sparse Tests` {
         }
 
         @Test
-        func `On a grid a dissection fills in far less than the natural order`() {
-            let pattern = Sparse.Symmetric<Double>.laplacian(rows: 100, columns: 100).pattern
+        func `On a grid a dissection fills in far less than the natural order`() throws {
+            let pattern = try Sparse.Symmetric<Double>.laplacian(rows: 100, columns: 100).pattern
             let natural = Sparse.Elimination(pattern, ordering: .natural(order: pattern.order)).count
             let dissected = Sparse.Elimination(pattern).count
             // The natural order fills the band: about 100 entries a column.
@@ -122,7 +123,7 @@ extension `Sparse Tests` {
     struct Factorization {
         @Test(arguments: [1, 2, 7, 48, 1000])
         func `A solve inverts the product`(leaf: Int) throws {
-            let matrix = Sparse.Symmetric<Double>.scattered(order: 300, perRow: 4, seed: 11)
+            let matrix = try Sparse.Symmetric<Double>.scattered(order: 300, perRow: 4, seed: 11)
             let elimination = Sparse.Elimination(matrix.pattern, ordering: .dissection(of: matrix.pattern, leaf: leaf))
             let factorization = try Sparse.Symmetric.Factorization(matrix, elimination: elimination)
             let x = `Sparse Tests`.vector(300)
@@ -132,7 +133,7 @@ extension `Sparse Tests` {
         @Test
         func `An indefinite matrix factors and solves without pivoting where its pivots are not zero`() throws {
             let matrix = try Sparse.Symmetric<Double>.laplacian(rows: 20, columns: 15)
-                .adding(.tridiagonal(order: 300, diagonal: 1, offDiagonal: 0), scaledBy: -3.3)
+                .adding(try .tridiagonal(order: 300, diagonal: 1, offDiagonal: 0), scaledBy: -3.3)
             let factorization = try matrix.factorization()
             let x = `Sparse Tests`.vector(300)
             #expect(`Sparse Tests`.distance(factorization.solved(matrix.applied(to: x)), x) < 1e-9)
@@ -150,8 +151,8 @@ extension `Sparse Tests` {
             for p in 1...rows {
                 for q in 1...columns where mu(p, rows) + mu(q, columns) < shift { below += 1 }
             }
-            let matrix = try Sparse.Symmetric<Double>.laplacian(rows: rows, columns: columns)
-                .adding(.tridiagonal(order: rows * columns, diagonal: 1, offDiagonal: 0), scaledBy: -shift)
+            let matrix = try Sparse.Symmetric<Double>.laplacian(rows: Cardinal(UInt(rows)), columns: Cardinal(UInt(columns)))
+                .adding(try .tridiagonal(order: Cardinal(UInt(rows * columns)), diagonal: 1, offDiagonal: 0), scaledBy: -shift)
             let inertia = try matrix.factorization().inertia
             #expect(inertia.negative == below)
             #expect(inertia.positive == rows * columns - below)
@@ -165,10 +166,10 @@ extension `Sparse Tests` {
 
         @Test
         func `A matrix on another pattern is refused`() throws {
-            let elimination = Sparse.Elimination(Sparse.Symmetric<Double>.laplacian(rows: 3, columns: 3).pattern)
+            let elimination = Sparse.Elimination(try Sparse.Symmetric<Double>.laplacian(rows: 3, columns: 3).pattern)
             #expect(throws: Sparse.Error.pattern) {
                 try Sparse.Symmetric.Factorization(
-                    Sparse.Symmetric<Double>.tridiagonal(order: 9, diagonal: 2, offDiagonal: -1),
+                    try Sparse.Symmetric<Double>.tridiagonal(order: 9, diagonal: 2, offDiagonal: -1),
                     elimination: elimination
                 )
             }

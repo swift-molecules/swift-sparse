@@ -63,10 +63,12 @@ extension Sparse.Symmetric {
             columns.append(Swift.max(entry.row, entry.column))
             values.append(entry.value)
         }
-        for index in 0..<order {
+        var index = 0
+        while index < order {
             rows.append(index)
             columns.append(index)
             values.append(0)
+            index += 1
         }
         self = Self.compressed(order: order, rows: rows, columns: columns, values: values)
     }
@@ -79,9 +81,11 @@ extension Sparse.Symmetric {
         for column in columns { byColumn[column + 1] += 1 }
         for index in 0..<order { byColumn[index + 1] += byColumn[index] }
         var orderByColumn = [Int](repeating: 0, count: total)
-        for entry in 0..<total {
+        var entry = 0
+        while entry < total {
             orderByColumn[byColumn[columns[entry]]] = entry
             byColumn[columns[entry]] += 1
+            entry += 1
         }
         var byRow = [Int](repeating: 0, count: order + 1)
         for row in rows { byRow[row + 1] += 1 }
@@ -97,10 +101,13 @@ extension Sparse.Symmetric {
         var sums: [Scalar] = []
         stored.reserveCapacity(total)
         sums.reserveCapacity(total)
-        for row in 0..<order {
+        var row = 0
+        while row < order {
             starts[row] = stored.count
             var last = -1
-            for position in byRow[row]..<byRow[row + 1] {
+            var position = byRow[row]
+            let positionEnd = byRow[row + 1]
+            while position < positionEnd {
                 let entry = sorted[position]
                 if columns[entry] == last {
                     sums[sums.count - 1] += values[entry]
@@ -109,7 +116,9 @@ extension Sparse.Symmetric {
                     stored.append(last)
                     sums.append(values[entry])
                 }
+                position += 1
             }
+            row += 1
         }
         starts[order] = stored.count
         return Self(pattern: Sparse.Pattern(order: order, starts: starts, columns: stored), values: sums)
@@ -135,10 +144,15 @@ extension Sparse.Symmetric {
     public var entries: [Entry] {
         var result: [Entry] = []
         result.reserveCapacity(values.count)
-        for row in 0..<order {
-            for position in pattern.starts[row]..<pattern.starts[row + 1] {
+        var row = 0
+        while row < order {
+            var position = pattern.starts[row]
+            let positionEnd = pattern.starts[row + 1]
+            while position < positionEnd {
                 result.append(Entry(row, pattern.columns[position], values[position]))
+                position += 1
             }
+            row += 1
         }
         return result
     }
@@ -153,13 +167,18 @@ extension Sparse.Symmetric {
     @inlinable
     public var norm: Scalar {
         var sums = [Scalar](repeating: 0, count: order)
-        for row in 0..<order {
-            for position in pattern.starts[row]..<pattern.starts[row + 1] {
+        var row = 0
+        while row < order {
+            var position = pattern.starts[row]
+            let positionEnd = pattern.starts[row + 1]
+            while position < positionEnd {
                 let size = Swift.abs(values[position])
                 sums[row] += size
                 let column = pattern.columns[position]
                 if column != row { sums[column] += size }
+                position += 1
             }
+            row += 1
         }
         return sums.max() ?? 0
     }
