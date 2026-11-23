@@ -31,66 +31,114 @@ extension Sparse.Symmetric.Factorization {
     public init(_ matrix: Sparse.Symmetric<Scalar>, elimination: Sparse.Elimination) throws(Sparse.Error) {
         guard matrix.pattern == elimination.pattern else { throw .pattern }
         let order = matrix.order
-        let parent = elimination.parent
-        let columnStarts = elimination.columnStarts
-        let rowStarts = elimination.rowStarts
-        let rowColumns = elimination.rowColumns
-        let sources = elimination.sources
-        let input = matrix.values
         var rows = [Int](repeating: 0, count: elimination.count)
         var values = [Scalar](repeating: 0, count: elimination.count)
         var pivots = [Scalar](repeating: 0, count: order)
-        var filled = [Int](repeating: 0, count: order)
-        var flag = [Int](repeating: -1, count: order)
-        var path = [Int](repeating: 0, count: order)
-        var y = [Scalar](repeating: 0, count: order)
-        // Up-looking: row k of L solves a triangular system along the elimination tree (Davis's LDL).
-        for k in 0..<order {
-            var top = order
-            flag[k] = k
-            for stored in rowStarts[k]..<rowStarts[k + 1] {
-                var i = rowColumns[stored]
-                y[i] += input[sources[stored]]
-                var length = 0
-                while i < k && flag[i] != k {
-                    path[length] = i
-                    length += 1
-                    flag[i] = k
-                    i = parent[i]
-                }
-                while length > 0 {
-                    length -= 1
-                    top -= 1
-                    path[top] = path[length]
-                }
-            }
-            var pivot = y[k]
-            y[k] = 0
-            while top < order {
-                let i = path[top]
-                top += 1
-                let yi = y[i]
-                y[i] = 0
-                let start = columnStarts[i]
-                let end = start + filled[i]
-                for p in start..<end {
-                    y[rows[p]] -= values[p] * yi
-                }
-                let l = yi / pivots[i]
-                pivot -= l * yi
-                rows[end] = k
-                values[end] = l
-                filled[i] += 1
-            }
-            guard pivot != 0, pivot.isFinite else {
-                throw .singular(elimination.ordering.permutation[k])
-            }
-            pivots[k] = pivot
-        }
+        let failed = Self.factor(
+            matrix.values,
+            elimination: elimination,
+            rows: &rows,
+            values: &values,
+            pivots: &pivots
+        )
+        if failed >= 0 { throw .singular(elimination.ordering.permutation[failed]) }
         self.elimination = elimination
         self.rows = rows
         self.values = values
         self.pivots = pivots
+    }
+
+    /// The numeric factorization, up-looking along the elimination tree (Davis's LDL): row `k` of `L` solves a sparse
+    /// triangular system whose pattern is the tree path from each entry of row `k`. Returns the position of the first
+    /// zero or non-finite pivot, or −1.
+    @inlinable
+    static func factor(
+        _ input: [Scalar],
+        elimination: Sparse.Elimination,
+        rows: inout [Int],
+        values: inout [Scalar],
+        pivots: inout [Scalar]
+    ) -> Int {
+        let order = pivots.count
+        let filled = UnsafeMutablePointer<Int>.allocate(capacity: Swift.max(order, 1))
+        let flag = UnsafeMutablePointer<Int>.allocate(capacity: Swift.max(order, 1))
+        let path = UnsafeMutablePointer<Int>.allocate(capacity: Swift.max(order, 1))
+        let y = UnsafeMutablePointer<Scalar>.allocate(capacity: Swift.max(order, 1))
+        defer {
+            unsafe filled.deallocate()
+            unsafe flag.deallocate()
+            unsafe path.deallocate()
+            unsafe y.deallocate()
+        }
+        unsafe filled.initialize(repeating: 0, count: order)
+        unsafe flag.initialize(repeating: -1, count: order)
+        unsafe y.initialize(repeating: 0, count: order)
+        return input.withUnsafeBufferPointer { input in
+            elimination.parent.withUnsafeBufferPointer { parent in
+                elimination.columnStarts.withUnsafeBufferPointer { columnStarts in
+                    elimination.rowStarts.withUnsafeBufferPointer { rowStarts in
+                        elimination.rowColumns.withUnsafeBufferPointer { rowColumns in
+                            elimination.sources.withUnsafeBufferPointer { sources in
+                                rows.withUnsafeMutableBufferPointer { rows in
+                                    values.withUnsafeMutableBufferPointer { values in
+                                        pivots.withUnsafeMutableBufferPointer { pivots in
+                                            var k = 0
+                                            while k < order {
+                                                var top = order
+                                                unsafe flag[k] = k
+                                                var stored = unsafe rowStarts[k]
+                                                let storedEnd = unsafe rowStarts[k + 1]
+                                                while stored < storedEnd {
+                                                    var i = unsafe rowColumns[stored]
+                                                    unsafe y[i] += input[sources[stored]]
+                                                    var length = 0
+                                                    while unsafe i < k && flag[i] != k {
+                                                        unsafe path[length] = i
+                                                        length += 1
+                                                        unsafe flag[i] = k
+                                                        i = unsafe parent[i]
+                                                    }
+                                                    while length > 0 {
+                                                        length -= 1
+                                                        top -= 1
+                                                        unsafe path[top] = path[length]
+                                                    }
+                                                    stored += 1
+                                                }
+                                                var pivot = unsafe y[k]
+                                                unsafe y[k] = 0
+                                                while top < order {
+                                                    let i = unsafe path[top]
+                                                    top += 1
+                                                    let yi = unsafe y[i]
+                                                    unsafe y[i] = 0
+                                                    let start = unsafe columnStarts[i]
+                                                    let end = unsafe start + filled[i]
+                                                    var p = start
+                                                    while p < end {
+                                                        unsafe y[rows[p]] -= values[p] * yi
+                                                        p += 1
+                                                    }
+                                                    let l = unsafe yi / pivots[i]
+                                                    pivot -= l * yi
+                                                    unsafe rows[end] = k
+                                                    unsafe values[end] = l
+                                                    unsafe filled[i] += 1
+                                                }
+                                                guard pivot != 0, pivot.isFinite else { return k }
+                                                unsafe pivots[k] = pivot
+                                                k += 1
+                                            }
+                                            return -1
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /// The order of the factored matrix.
@@ -119,28 +167,62 @@ extension Sparse.Symmetric.Factorization {
     @inlinable
     public func solve(_ b: [Scalar], into x: inout [Scalar]) {
         precondition(b.count == order && x.count == order, "a vector of the matrix's order")
-        let permutation = elimination.ordering.permutation
-        let starts = elimination.columnStarts
-        var z = [Scalar](repeating: 0, count: order)
-        for k in 0..<order { z[k] = b[permutation[k]] }
-        for column in 0..<order {
-            let zc = z[column]
-            if zc != 0 {
-                for p in starts[column]..<starts[column + 1] {
-                    z[rows[p]] -= values[p] * zc
+        let order = self.order
+        let z = UnsafeMutablePointer<Scalar>.allocate(capacity: Swift.max(order, 1))
+        defer { unsafe z.deallocate() }
+        elimination.ordering.permutation.withUnsafeBufferPointer { permutation in
+            elimination.columnStarts.withUnsafeBufferPointer { starts in
+                rows.withUnsafeBufferPointer { rows in
+                    values.withUnsafeBufferPointer { values in
+                        pivots.withUnsafeBufferPointer { pivots in
+                            b.withUnsafeBufferPointer { b in
+                                var k = 0
+                                while k < order {
+                                    unsafe (z + k).initialize(to: b[permutation[k]])
+                                    k += 1
+                                }
+                                var column = 0
+                                while column < order {
+                                    let zc = unsafe z[column]
+                                    if zc != 0 {
+                                        var p = unsafe starts[column]
+                                        let end = unsafe starts[column + 1]
+                                        while p < end {
+                                            unsafe z[rows[p]] -= values[p] * zc
+                                            p += 1
+                                        }
+                                    }
+                                    column += 1
+                                }
+                                k = 0
+                                while k < order {
+                                    unsafe z[k] /= pivots[k]
+                                    k += 1
+                                }
+                                column = order - 1
+                                while column >= 0 {
+                                    var sum = unsafe z[column]
+                                    var p = unsafe starts[column]
+                                    let end = unsafe starts[column + 1]
+                                    while p < end {
+                                        unsafe sum -= values[p] * z[rows[p]]
+                                        p += 1
+                                    }
+                                    unsafe z[column] = sum
+                                    column -= 1
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
-        for k in 0..<order { z[k] /= pivots[k] }
-        var column = order - 1
-        while column >= 0 {
-            var sum = z[column]
-            for p in starts[column]..<starts[column + 1] {
-                sum -= values[p] * z[rows[p]]
+        elimination.ordering.permutation.withUnsafeBufferPointer { permutation in
+            var k = 0
+            while k < order {
+                unsafe x[permutation[k]] = z[k]
+                k += 1
             }
-            z[column] = sum
-            column -= 1
         }
-        for k in 0..<order { x[permutation[k]] = z[k] }
     }
 }
