@@ -1,0 +1,9 @@
+description: "Sparse symmetric matrices for Swift: compressed storage, a fill-reducing ordering and an LDLᵀ factorization with its inertia."
+topics:
+  - primitives
+  - sparse
+  - linear-algebra
+  - numerics
+homepage: "https://swift-institute.org"
+readme:
+  family: E
