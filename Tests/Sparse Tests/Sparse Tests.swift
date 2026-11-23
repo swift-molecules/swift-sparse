@@ -1,4 +1,3 @@
-import Cardinal
 import Foundation
 import Sparse
 import Sparse_Test_Support

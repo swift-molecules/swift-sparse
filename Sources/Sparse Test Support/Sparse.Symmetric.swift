@@ -1,4 +1,3 @@
-public import Cardinal
 public import Sparse
 
 extension Sparse.Symmetric {
